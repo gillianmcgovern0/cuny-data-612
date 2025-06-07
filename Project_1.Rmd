@@ -1,0 +1,237 @@
+---
+title: "DATA 612 - Project 1"
+author: "Gillian McGovern"
+date: "2025-06-05"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(caret)
+library(recommenderlab)
+```
+
+### Overview
+
+This recommender system suggests broadway shows to users. In this project we'll compare a recommender system based off of the data's overall average, and a Global Baseline Predictors recommender system.
+
+### Get the Data
+
+The below data frame is synthetic data. The broadway shows I looked at are Cabaret, Chicago, Good Night, and Good Luck, Hadestown, Hamilton, The Lion King, Othello, The Outsiders, and Wicked. Additionally, there is a show rating range of 1 - 5. Note, we have 3 missing values in this dataset.
+
+```{r}
+df <- data.frame(Critic = c("u1", "u2", "u3", "u4", "u5", "u6", "u7", "u8", "u9", "u10"),
+                 Cabaret = c(5, 4, 4, 3, 4, 2, 2, 3, 4, 4),
+                 Chicago = c(3, 2, 2, 2, 4, 3, 2, 3, 3, 4),
+                 GoodNightAndGoodLuck = c(5, 3, 4, 5, 4, 4, 4, 3, 4, 5),
+                 Hadestown = c(2, 5, 5, 4, 4, 4, 5, 3, 4, NA),
+                 Hamilton = c(4, 5, 5, 4, NA, 4, 5, 3, 5, 5),
+                 TheLionKing = c(5, 3, 4, 4, 5, NA, 4, 3, 4, 5),
+                 Othello = c(5, 3, 4, 4, 5, 4, 3, 3, 5, 5),
+                 TheOutsiders = c(5, 3, 4, 4, 5, 4, 2, 3, 4, 3),
+                 Wicked = c(5, 3, 4, 4, 5, 3, 4, 3, 4, 5))
+```
+
+I then turned the data frame into a matrix:
+
+```{r}
+show_matrix <- as.matrix(df[, -which(names(df) == "Critic")])
+row.names(show_matrix) = c("u1", "u2", "u3", "u4", "u5", "u6", "u7", "u8", "u9", "u10")
+real_show_matrix <- as(show_matrix, "realRatingMatrix")
+getRatingMatrix(real_show_matrix)
+```
+
+### Split data into training and test sets
+
+Let's creating the training and test data set:
+
+```{r}
+set.seed(786)
+sample <- sample(c(TRUE, FALSE), nrow(df), replace=TRUE, prob=c(0.8,0.2))
+train <- df[sample, ]
+test <- df[!sample, ]
+```
+
+Convert to matrix:
+
+```{r}
+# Convert to matrix
+train_matrix <- as.matrix(train[, -which(names(train) == "Critic")])
+row.names(train_matrix) = c("u2", "u3", "u4", "u5", "u7", "u8", "u10")
+real_train_matrix <- as(train_matrix, "realRatingMatrix")
+
+test_matrix <- as.matrix(test[, -which(names(test) == "Critic")])
+row.names(test_matrix) = c("u1", "u6", "u9")
+real_test_matrix <- as(test_matrix, "realRatingMatrix")
+
+getRatingMatrix(real_train_matrix)
+getRatingMatrix(real_test_matrix)
+```
+
+### Creating the Recommender
+
+#### Find the overall mean rating
+
+I first found the overall mean show rating for the entire matrix:
+
+```{r}
+# Find the mean rating for training set
+mean_rating_overall <- mean(train_matrix, na.rm = TRUE)
+mean_rating_overall
+```
+
+The average for the training set is 3.786885.
+
+Calculate RMSE:
+
+```{r}
+mean_rating_overall_train_df <- data.frame(matrix(mean_rating_overall, nrow = 7, ncol = 9, byrow = TRUE))
+mean_rating_overall_test_df <- data.frame(matrix(mean_rating_overall, nrow = 3, ncol = 9, byrow = TRUE))
+
+# RMSE for training set (comparing against the overall mean)
+rmse_train <- RMSE(c(train_matrix), c(as.matrix(mean_rating_overall_train_df)), na.rm = TRUE)
+rmse_train
+
+# RMSE for test set
+rmse_test <- RMSE(c(test_matrix), c(as.matrix(mean_rating_overall_test_df)), na.rm = TRUE)
+rmse_test
+```
+
+The RMSE for the training set is 0.9428724, and for the test set is 0.9025789. Both of these RMSE values are very high, meaning the residuals have a large variance. This indicates using just the average rating is not a good model to use for predictions.
+
+#### Find the mean for each show and user
+
+```{r}
+# Training data
+# Find the mean for each show (I created a data frame)
+show_mean_ratings <- data.frame(show=colnames(train_matrix), mean_rating=NA, relative_to_avg=NA)
+show_mean_ratings$mean_rating <- colMeans(train[, -which(names(train) == "Critic")], na.rm = TRUE)
+
+# Find the mean diff/bias: show avg - overall mean show rating
+show_mean_ratings$relative_to_avg  <- show_mean_ratings$mean_rating - mean_rating_overall
+show_mean_ratings
+
+# Find the mean for each user
+user_mean_ratings <- data.frame(user=c("u2", "u3", "u4", "u5", "u7", "u8", "u10"), mean_rating=NA, relative_to_avg=NA)
+user_mean_ratings$mean_rating  <- rowMeans(train[, -which(names(train) == "Critic")], na.rm = TRUE)
+
+# Find the mean diff/bias: user avg - overall mean user rating
+user_mean_ratings$relative_to_avg  <- user_mean_ratings$mean_rating - mean_rating_overall
+user_mean_ratings
+```
+
+Since I split the training/test set by row, the training set doesn't contain all the users to calculate the bias for each user and each item. So I found the averages for the test set as well:
+
+```{r}
+# Test data
+# Find the mean for each show
+show_mean_ratings_test <- data.frame(show=colnames(test_matrix), mean_rating=NA, relative_to_avg=NA)
+show_mean_ratings_test$mean_rating <- colMeans(test[, -which(names(test) == "Critic")], na.rm = TRUE)
+
+# Find the mean diff/bias: show avg - overall mean show rating
+show_mean_ratings_test$relative_to_avg  <- show_mean_ratings_test$mean_rating - mean_rating_overall
+show_mean_ratings_test
+
+# Find the mean for each user
+user_mean_ratings_test <- data.frame(user=c("u1", "u6", "u9"), mean_rating=NA, relative_to_avg=NA)
+user_mean_ratings_test$mean_rating  <- rowMeans(test[, -which(names(test) == "Critic")], na.rm = TRUE)
+
+# Find the mean diff/bias: user avg - overall mean user rating
+user_mean_ratings_test$relative_to_avg  <- user_mean_ratings_test$mean_rating - mean_rating_overall
+user_mean_ratings_test
+```
+
+#### Calculate baseline predictors
+
+```{r}
+# Global Baseline Estimate = Mean Show Rating + Selected Show's rating relative to average + User's rating relative to average
+# Create a function that calculates the baseline predictors given the show and user
+predict_rating <- function(bway_user, bway_show, train_or_test) {
+  shows <- show_mean_ratings
+  users <- user_mean_ratings
+  if (train_or_test == "test") {
+    shows <- show_mean_ratings_test
+    users <- user_mean_ratings_test
+  }
+  filtered_show_rating <- shows |>
+    filter(show == bway_show)
+  filtered_user_rating <- users |>
+    filter(user == bway_user)
+  final_prediction <- mean_rating_overall + filtered_show_rating$relative_to_avg + filtered_user_rating$relative_to_avg
+  return(final_prediction)
+}
+
+# Baseline predictors for training set
+training_predictions <- data.frame(matrix(NA, nrow = 7, ncol = 9, byrow = TRUE))
+colnames(training_predictions) <- show_mean_ratings$show
+training_predictions$user <- user_mean_ratings$user
+
+# Make predictions
+training_predictions <- training_predictions |>
+  mutate(
+    across(Cabaret:Wicked, ~ predict_rating(training_predictions$user, cur_column(), "train"))
+  )
+# Final baseline predictors
+training_predictions
+
+# Since we use na.rm = TRUE for RMSE(), we don't need to remove missing values but to keep it cleaner, let's just remove
+original_train_vector <- c(train_matrix)
+original_train_vector <- as.numeric(original_train_vector[-c(28,32)]) # remove missing values
+training_predictions_vector <- c(as.matrix(training_predictions))
+training_predictions_vector <- as.numeric(training_predictions_vector[-c(28,32, 64:70)])
+
+# RMSE for training set
+rmse_train <- RMSE(original_train_vector, training_predictions_vector, na.rm = TRUE)
+rmse_train
+```
+
+Note we can see the missing values from the training set:
+
+* u10's rating for Hadestown is predicted to be 5.046448
+* u5's rating for Hamilton is predicted to be 5.213115
+
+The RMSE for the training set is 0.5808235 which is a big improvement from using just the average.
+
+Now let's do the same for the test set:
+
+```{r}
+# Baseline predictors for test set
+test_predictions <- data.frame(matrix(NA, nrow = 3, ncol = 9, byrow = TRUE))
+colnames(test_predictions) <- show_mean_ratings$show
+test_predictions$user <- c("u1", "u6", "u9")
+test_predictions
+
+# Make predictions
+test_predictions <- test_predictions |>
+  mutate(
+    across(Cabaret:Wicked, ~ predict_rating(test_predictions$user, cur_column(), "test"))
+  )
+# Final baseline predictors
+test_predictions
+
+# Since we use na.rm = TRUE for RMSE(), we don't need to remove missing values but to keep it cleaner, let's just remove
+original_test_vector <- c(test_matrix)
+original_test_vector <- as.numeric(original_test_vector[-c(17)]) # remove missing values
+test_predictions_vector <- c(as.matrix(test_predictions))
+test_predictions_vector <- as.numeric(test_predictions_vector[-c(17, 28:30)])
+
+# RMSE for test set
+rmse_test <- RMSE(original_test_vector, test_predictions_vector, na.rm = TRUE)
+rmse_test
+```
+
+Note we can see the missing values from the test set:
+
+* u6's rating for The Lion King is predicted to be 4.213115
+
+The RMSE for the test set is 0.6519566 which is also a big improvement from using just the average.
+
+The RMSE for the test set is slightly larger than the training set.
+
+## Conclusions
+
+This project showed how to create a Global Baseline Predictors recommender system, and how to evaluate it. Our Global Baseline Predictors model was able to predict the missing values in the training and test sets. By looking at the RMSE, we were able to see that using a Global Baseline Predictors recommender system is much better than using a recommender system based off the average of all the data.
