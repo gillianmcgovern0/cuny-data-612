@@ -1,0 +1,69 @@
+---
+title: "DATA 612 - Research Discussion Assignment 1"
+author: "Gillian McGovern"
+date: "2025-06-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Part 1
+
+## Now that we have covered basic techniques for recommender systems, choose one commercial recommender and describe how you think it works (content-based, collaborative filtering, etc).
+
+OpenTable not only helps users make a dining reservation, but it also recommends restaurants to users for any location. This is a recommender system I've used plenty of times when finding a restaurant. OpenTable, like many products, is used to pick a restaurant and review it after the restaurant experience. Its users are a mix of new and returning. Since there are not too many competitor reservation systems out there, many users are returning customers. Like many recommender systems, it uses a combination of collaborative and content-based filtering.
+
+Collaborative filtering:
+
+OpenTable uses a neighborhood-based approach for recommendations that finds users that are similar, or restaurants that are similar.
+
+It uses a combination of explicit and implicit data from the user:
+
+** Explicit use cases:
+
+*** User ratings for restaurants
+*** How many times a restaurant reservation was made
+
+** Implicit use cases:
+
+*** Number of restaurant searches for a user - if a user searches for a restaurant 500 times, that weighs more than a restaurant that has only been searched once
+*** Number of clicks on a restaurant
+*** Restaurant view times
+
+Both cases can use matrix factorization for recommendation models.
+
+Content-based filtering:
+
+There are also users that do not interact with OpenTable very often. OpenTable has a ton of restaurant data from the description, menus, pictures, reviews, location, price, noise level, etc. It can easily break down a restaurant into different topics and find other restaurants that match one or more of the topics. Even if a user has booked a restaurant only once using their system, they can match a similar restaurant based on the restaurant data.
+
+Factorization machines (hybrid):
+
+OpenTable uses a combination of all the methods above. It has mentioned that it uses factorization machines that combine all the data, including content, into a giant matrix to make their recommendations.
+
+## Does the technique deliver a good experience or are the recommendations off-target?
+
+I think overall OpenTable has a pretty good recommendation system. I have found restaurants through OpenTable that were recommended. I think it is important for OpenTable to combine both types of models since it has a lot of data related to users and restaurants. I think there is room for improvement such as letting users be able to create curated lists for saved restaurants. This would help OpenTable identify what's important to a user when it comes to restaurants they would like to try. Also, the ability to rank saved restaurants could also be beneficial to OpenTable.
+
+# Part 2
+
+## Can you think of a similar example where a collective effort to alter the workings of content recommendations have been successful? How would you design a system to prevent this kind of abuse?
+
+One recommender company who has experienced fake reviews, which has been focused on by CNBC as recently as May this year, is Tripadvisor. Tripadvisor has many different categories for fake review motives such as, people from the company posting positive reviews, competitors adding negative reviews, irrelevant reviews, and paid reviews. In 2024, 2.7 million reviews were deemed as fake, which is double the number the company detected in 2022. In 2024, Tripadvisor had ~30 million total reviews.
+
+To prevent fake reviews, it's important to look at the behavior of the fake review users to detect patterns. With AI, it can sometimes be difficult to spot a fake review just by looking at the review's content. Tripadvisor has gone the extra mile and set up investigators that have posed as fake review brokers. Tripadvisor has then been able to follow and collect data on the person who set up the fake paid review post. That way Tripadvisor can confidently identify a fake review user and their patterns. I have also heard of recommender companies looking at the IP address to track companies that supply fake paid reviews.
+
+### Sources
+
+#### Part 1
+
+* https://tech.opentable.com/recommendation-architecture/
+* https://tech.opentable.com/data-science-to-dining-expert/
+* Jeremy Schiff, Senior Manager, Data Science, OpenTable @ MLconf NYC https://www.youtube.com/watch?v=_y8oBKJUi-s
+* Sudeep Das - Using Data Science to Transform OpenTable Into Your Local Dining Expert https://www.youtube.com/watch?v=lwQNwbZX8V4
+* Using Data Science to Transform OpenTable Into Your Local Dining Expert Pablo Delgado Opentable INC https://www.youtube.com/watch?v=q0wG02OGs3I
+
+### Part 2
+
+* How Tripadvisor detects fake reviews https://www.cnbc.com/video/2025/05/27/spotting-fake-reviews-on-travel-sites-what-to-look-out-for.html
